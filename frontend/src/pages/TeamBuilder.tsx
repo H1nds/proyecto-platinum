@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { useTeamStore } from '../store/useTeamStore';
-import { Plus, X, ArrowLeft, Trash2, Edit2 } from 'lucide-react';
+import { Plus, X, ArrowLeft, Trash2, Edit2, Download } from 'lucide-react';
 import PokemonSearchModal from '../components/PokemonSearchModal';
 import PokemonEditor from '../components/PokemonEditor';
 import ShowdownImportModal from '../components/ShowdownImportModal';
