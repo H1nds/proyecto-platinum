@@ -15,6 +15,7 @@ export default function MainLayout() {
   const location = useLocation();
   const navigate = useNavigate();
   const [username, setUsername] = useState('Cargando...');
+  const [avatarUrl, setAvatarUrl] = useState('https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/778.png');
   const [userId, setUserId] = useState<string | null>(null);
   const [isFriendModalOpen, setIsFriendModalOpen] = useState(false);
   const [isRequestsModalOpen, setIsRequestsModalOpen] = useState(false);
@@ -68,12 +69,14 @@ export default function MainLayout() {
         return;
       }
 
-      const realName = session.user.user_metadata?.username;
-      setUsername(realName || 'Entrenador');
-      setUserId(session.user.id);
-      
-      // Llamamos a la base de datos para cargar la barra lateral
-      loadSocialData(session.user.id);
+      const { data } = await supabase.from('profiles').select('username, avatar_url').eq('id', session.user.id).single();
+
+        if (data) {
+            setUsername(data.username);
+            if (data.avatar_url) setAvatarUrl(data.avatar_url);
+        }
+        setUserId(session.user.id);
+        loadSocialData(session.user.id);
     };
 
     checkSession();
@@ -113,6 +116,28 @@ export default function MainLayout() {
     };
   }, [userId]);
 
+  useEffect(() => {
+  if (!userId) return;
+
+    // Escuchar cualquier cambio ('UPDATE') en la tabla 'profiles'
+    const profilesChannel = supabase
+        .channel('public:profiles')
+        .on(
+            'postgres_changes',
+            { event: 'UPDATE', schema: 'public', table: 'profiles' },
+            (payload) => {
+                // Cuando CUALQUIER perfil se actualice, recargamos la lista de amigos 
+                // para asegurarnos de tener los datos más recientes de todos.
+                loadSocialData(userId);
+            }
+        )
+        .subscribe();
+
+    return () => {
+        supabase.removeChannel(profilesChannel);
+    };
+    }, [userId]);
+
   const handleLogout = async () => {
     await supabase.auth.signOut();
     navigate('/'); 
@@ -134,7 +159,8 @@ export default function MainLayout() {
           <div className="w-12 h-12 rounded-full bg-gradient-to-tr from-pink-500 to-purple-500 p-[2px] shrink-0">
             <div className="w-full h-full bg-gray-900 rounded-full flex items-center justify-center overflow-hidden">
               {/* Aquí usamos una imagen genérica mientras carga el perfil real */}
-              <img src="https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/778.png" alt="Avatar" className="w-10 h-10 object-contain" />
+              {/* Busca esta línea y reemplázala: */}
+                <img src={avatarUrl} alt="Avatar" className="w-10 h-10 object-contain" />
             </div>
           </div>
           <div className="overflow-hidden">
@@ -255,17 +281,20 @@ export default function MainLayout() {
         onClose={() => setIsProfileModalOpen(false)}
         userId={userId}
         onUpdate={() => {
-          // Esta función recargará el nombre en la barra lateral cuando lo cambies
-          const reload = async () => {
-            const { data: { session } } = await supabase.auth.getSession();
-            if (session) {
-              const { data } = await supabase.from('profiles').select('username').eq('id', session.user.id).single();
-              if (data) setUsername(data.username);
-            }
-          };
-          reload();
+            const reload = async () => {
+                const { data: { session } } = await supabase.auth.getSession();
+                if (session) {
+                    // Traemos también el avatar_url
+                    const { data } = await supabase.from('profiles').select('username, avatar_url').eq('id', session.user.id).single();
+                    if (data) {
+                        setUsername(data.username);
+                        setAvatarUrl(data.avatar_url); // Actualizamos el estado del avatar
+                    }
+                }
+            };
+            reload();
         }}
-      />
+        />  
       {/* Barra lateral para PC (Oculta en móviles) */}
       <div className="hidden md:block w-72 h-full z-20">
         <SidebarContent />
