@@ -43,6 +43,7 @@ const handleImport = () => {
        item: set.item || '',
        ability: set.ability || '',
        nature: set.nature || 'Serious',
+       level: set.level || 50,
        // Showdown a veces omite EVs/IVs si están en 0 o 31, nos aseguramos de poner los valores por defecto
        evs: { hp: 0, atk: 0, def: 0, spa: 0, spd: 0, spe: 0, ...set.evs },
        ivs: { hp: 31, atk: 31, def: 31, spa: 31, spd: 31, spe: 31, ...set.ivs },

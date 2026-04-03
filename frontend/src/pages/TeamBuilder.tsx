@@ -1,19 +1,28 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { useTeamStore } from '../store/useTeamStore';
-import { Plus, X, ArrowLeft, Trash2, Edit2, Download } from 'lucide-react';
+import { Plus, X, ArrowLeft, Trash2, Edit2, Download, Save, Loader2 } from 'lucide-react';
 import PokemonSearchModal from '../components/PokemonSearchModal';
 import PokemonEditor from '../components/PokemonEditor';
 import ShowdownImportModal from '../components/ShowdownImportModal';
 
 export default function TeamBuilder() {
   // Añadimos updateTeam que acabamos de crear en Zustand
-  const { teams, activeTeamId, removeTeamMember, updateTeamMember, createNewTeam, setActiveTeam, deleteTeam, updateTeam } = useTeamStore();
-  
+  const { 
+  teams, activeTeamId, isLoading, isSaving, 
+  fetchTeams, saveTeam, createNewTeam, setActiveTeam, 
+  deleteTeam, updateTeam, removeTeamMember, updateTeamMember 
+  } = useTeamStore();
+
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [selectedSlot, setSelectedSlot] = useState<number | null>(null);
   const [isImportOpen, setIsImportOpen] = useState(false);
   const [editingSlot, setEditingSlot] = useState<number | null>(null);
+
+  // Cargar equipos desde Supabase al entrar a la pantalla
+  useEffect(() => {
+    fetchTeams();
+  }, [fetchTeams]);
 
   const activeTeam = teams.find(t => t.id === activeTeamId);
 
@@ -72,7 +81,7 @@ export default function TeamBuilder() {
           )}
         </div>
         
-        {/* Barra de Herramientas del Equipo (Formato e Importar) */}
+        {/* Barra de Herramientas del Equipo (Formato, Importar y Guardar) */}
      {activeTeam ? (
        <div className="mb-8 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
          <div className="flex items-center gap-3">
@@ -88,16 +97,34 @@ export default function TeamBuilder() {
            </select>
          </div>
 
-         <button 
-           onClick={() => setIsImportOpen(true)}
-           className="flex items-center gap-2 px-4 py-2 bg-gray-900 border border-gray-800 text-white text-sm font-semibold rounded-lg hover:bg-gray-800 hover:border-pink-500/50 transition-all"
-         >
-           <Download size={16} className="text-pink-500" />
-           Importar de Showdown
-         </button>
+         <div className="flex items-center gap-3">
+           <button 
+             onClick={() => setIsImportOpen(true)}
+             className="flex items-center gap-2 px-4 py-2 bg-gray-900 border border-gray-800 text-white text-sm font-semibold rounded-lg hover:bg-gray-800 hover:border-pink-500/50 transition-all"
+           >
+             <Download size={16} className="text-pink-500" />
+             Importar
+           </button>
+
+           <button 
+             onClick={() => saveTeam(activeTeam.id)}
+             disabled={isSaving}
+             className="flex items-center gap-2 px-6 py-2 bg-pink-600 hover:bg-pink-500 disabled:opacity-70 text-white text-sm font-bold rounded-lg transition-all shadow-lg shadow-pink-500/20"
+           >
+             {isSaving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
+             {isSaving ? 'Guardando...' : 'Guardar Equipo'}
+           </button>
+         </div>
        </div>
      ) : (
-       <p className="mb-8 text-gray-400">Construye tus equipos, importa tus estrategias y prepárate para dominar el meta.</p>
+       // Vista de carga inicial para la lista de equipos
+       isLoading ? (
+         <div className="flex justify-center py-12">
+           <Loader2 className="w-10 h-10 text-pink-500 animate-spin" />
+         </div>
+       ) : (
+         <p className="mb-8 text-gray-400">Construye tus equipos, importa tus estrategias y prepárate para dominar el meta.</p>
+       )
      )}
 
      {/* Renderizamos el Editor de Pokémon manual */}
