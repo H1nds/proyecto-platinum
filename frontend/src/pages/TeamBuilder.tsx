@@ -1,10 +1,12 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { useTeamStore } from '../store/useTeamStore';
-import { Plus, X, ArrowLeft, Trash2, Edit2, Download, Save, Loader2 } from 'lucide-react';
+import { Plus, X, ArrowLeft, Trash2, Edit2, Download, Save, Loader2, Share2, Activity } from 'lucide-react';
 import PokemonSearchModal from '../components/PokemonSearchModal';
 import PokemonEditor from '../components/PokemonEditor';
 import ShowdownImportModal from '../components/ShowdownImportModal';
+import ShowdownExportModal from '../components/ShowdownExportModal';
+import TeamSynergyModal from '../components/TeamSynergyModal';
 
 export default function TeamBuilder() {
   // Añadimos updateTeam que acabamos de crear en Zustand
@@ -17,6 +19,8 @@ export default function TeamBuilder() {
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [selectedSlot, setSelectedSlot] = useState<number | null>(null);
   const [isImportOpen, setIsImportOpen] = useState(false);
+  const [isExportOpen, setIsExportOpen] = useState(false);   // <-- NUEVO
+  const [isSynergyOpen, setIsSynergyOpen] = useState(false); // <-- NUEVO
   const [editingSlot, setEditingSlot] = useState<number | null>(null);
 
   // Cargar equipos desde Supabase al entrar a la pantalla
@@ -97,24 +101,44 @@ export default function TeamBuilder() {
            </select>
          </div>
 
-         <div className="flex items-center gap-3">
-           <button 
-             onClick={() => setIsImportOpen(true)}
-             className="flex items-center gap-2 px-4 py-2 bg-gray-900 border border-gray-800 text-white text-sm font-semibold rounded-lg hover:bg-gray-800 hover:border-pink-500/50 transition-all"
-           >
-             <Download size={16} className="text-pink-500" />
-             Importar
-           </button>
+         <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+              {/* Botón Sinergia */}
+              <button 
+                onClick={() => setIsSynergyOpen(true)}
+                className="flex items-center gap-2 px-3 py-2 bg-gray-900 border border-gray-800 text-gray-300 text-sm font-semibold rounded-lg hover:bg-gray-800 hover:text-white transition-all"
+              >
+                <Activity size={16} className="text-blue-400" />
+                <span className="hidden sm:inline">Sinergia</span>
+              </button>
 
-           <button 
-             onClick={() => saveTeam(activeTeam.id)}
-             disabled={isSaving}
-             className="flex items-center gap-2 px-6 py-2 bg-pink-600 hover:bg-pink-500 disabled:opacity-70 text-white text-sm font-bold rounded-lg transition-all shadow-lg shadow-pink-500/20"
-           >
-             {isSaving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
-             {isSaving ? 'Guardando...' : 'Guardar Equipo'}
-           </button>
-         </div>
+              {/* Botones Importar / Exportar */}
+              <div className="flex items-center bg-gray-900 border border-gray-800 rounded-lg overflow-hidden">
+                <button 
+                  onClick={() => setIsImportOpen(true)}
+                  className="flex items-center gap-2 px-3 py-2 text-gray-300 text-sm font-semibold hover:bg-gray-800 hover:text-white transition-all border-r border-gray-800"
+                >
+                  <Download size={16} className="text-pink-500" />
+                  <span className="hidden sm:inline">Importar</span>
+                </button>
+                <button 
+                  onClick={() => setIsExportOpen(true)}
+                  className="flex items-center gap-2 px-3 py-2 text-gray-300 text-sm font-semibold hover:bg-gray-800 hover:text-white transition-all"
+                >
+                  <Share2 size={16} className="text-pink-500" />
+                  <span className="hidden sm:inline">Exportar</span>
+                </button>
+              </div>
+              
+              {/* Botón Guardar */}
+              <button 
+                onClick={() => saveTeam(activeTeam.id)}
+                disabled={isSaving}
+                className="flex items-center gap-2 px-5 py-2 bg-pink-600 hover:bg-pink-500 disabled:opacity-70 text-white text-sm font-bold rounded-lg transition-all shadow-lg shadow-pink-500/20 ml-2"
+              >
+                {isSaving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
+                {isSaving ? 'Guardando...' : <span className="hidden sm:inline">Guardar Equipo</span>}
+              </button>
+            </div>
        </div>
      ) : (
        // Vista de carga inicial para la lista de equipos
@@ -255,6 +279,8 @@ export default function TeamBuilder() {
           onClose={() => setIsSearchOpen(false)}
           onSelect={handleSelectPokemon}
         />
+
+        
 
       </div>
     </div>
