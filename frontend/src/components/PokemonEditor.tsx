@@ -1,12 +1,8 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X } from 'lucide-react';
 import { useTeamStore } from '../store/useTeamStore';
 import { Dex } from '@pkmn/dex';
-import { Generations } from '@pkmn/data';
-
-const gens = new Generations(Dex);
-const gen9 = gens.get(9);
 
 const STAT_NAMES = ['hp', 'atk', 'def', 'spa', 'spd', 'spe'] as const;
 const STAT_LABELS = { hp: 'HP', atk: 'Atk', def: 'Def', spa: 'SpA', spd: 'SpD', spe: 'Spe' };
@@ -20,59 +16,33 @@ interface PokemonEditorProps {
 export default function PokemonEditor({ teamId, memberIndex, onClose }: PokemonEditorProps) {
   const { teams, updateTeamMember } = useTeamStore();
   const [activeTab, setActiveTab] = useState<'general' | 'stats' | 'moves'>('general');
-  const [legalMoves, setLegalMoves] = useState<string[]>([]);
 
+  // Cargamos las listas globales directamente y de forma segura
   const allItems = useMemo(() => Array.from(Dex.items.all()), []);
   const allAbilities = useMemo(() => Array.from(Dex.abilities.all()), []);
   const allNatures = useMemo(() => Array.from(Dex.natures.all()), []);
-  const allMovesFallback = useMemo(() => Array.from(Dex.moves.all()), []);
+  const allMoves = useMemo(() => Array.from(Dex.moves.all()), []);
 
   if (memberIndex === null) return null;
 
   const activeTeam = teams.find(t => t.id === teamId);
   const pokemon = activeTeam?.members[memberIndex];
 
-  if (!pokemon || !pokemon.pokemonId) return null;
+  if (!pokemon || !pokemon.pokemonId || !pokemon.name) return null;
 
-  // --- 1. ELIMINAMOS LA LÍNEA ROJA DE TYPESCRIPT ---
-  // Le decimos a TypeScript que esto es un texto seguro al 100%
-  const pokemonNameSeguro = pokemon.name ? String(pokemon.name) : "";
+  // Aseguramos que el nombre es un texto válido
+  const safeName = String(pokemon.name);
 
   const handleChange = (changes: Partial<typeof pokemon>) => {
     updateTeamMember(teamId, memberIndex, changes);
   };
 
-  useEffect(() => {
-    async function loadLegalMoves() {
-      if (!pokemonNameSeguro) return;
-      try {
-        // Usamos la variable segura, así que TypeScript no se va a quejar jamás
-        const species = gen9.species.get(pokemonNameSeguro);
-        if (!species) return;
+  // --- MOTOR MATEMÁTICO 100% SEGURO ---
+  // Usamos Dex directo, ignorando `@pkmn/data` para evitar crashes de Vite
+  const speciesData = Dex.species.get(safeName);
+  const natureObj = Dex.natures.get(pokemon.nature || 'Serious');
+  const safeLevel = Number(pokemon.level) || 50;
 
-        let learnset = await Dex.learnsets.get(species.id);
-        if (!learnset || !learnset.learnset) {
-          const baseSpecies = gen9.species.get(species.baseSpecies);
-          if (baseSpecies) learnset = await Dex.learnsets.get(baseSpecies.id);
-        }
-
-        if (learnset && learnset.learnset) {
-          const moveIds = Object.keys(learnset.learnset);
-          const moveNames = moveIds.map(id => gen9.moves.get(id)?.name).filter(Boolean) as string[];
-          setLegalMoves(moveNames);
-        } else {
-          setLegalMoves(allMovesFallback.map(m => m.name));
-        }
-      } catch (error) {
-        setLegalMoves(allMovesFallback.map(m => m.name));
-      }
-    }
-    loadLegalMoves();
-  }, [pokemonNameSeguro, allMovesFallback]);
-
-
-  // --- 2. ELIMINAMOS LA PANTALLA BLANCA DE ERROR DE 'hp' ---
-  // Este "escudo" atrapa los datos dañados de Supabase y les pone 0
   const getSafeStat = (obj: any, statKey: string, fallback: number) => {
     if (obj && typeof obj === 'object' && statKey in obj) {
       const val = Number(obj[statKey]);
@@ -80,10 +50,6 @@ export default function PokemonEditor({ teamId, memberIndex, onClose }: PokemonE
     }
     return fallback;
   };
-
-  const speciesData = gen9.species.get(pokemonNameSeguro);
-  const natureObj = gen9.natures.get(pokemon.nature || 'Serious');
-  const safeLevel = Number(pokemon.level) || 50;
 
   const calculateStat = (statName: string, base: number, iv: number, ev: number, level: number, nature: any) => {
     if (statName === 'hp') {
@@ -104,6 +70,7 @@ export default function PokemonEditor({ teamId, memberIndex, onClose }: PokemonE
       <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={onClose} className="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm" />
       
       <motion.div initial={{ x: '100%' }} animate={{ x: 0 }} exit={{ x: '100%' }} transition={{ type: 'spring', damping: 25, stiffness: 200 }} className="fixed top-0 right-0 bottom-0 z-50 w-full max-w-lg bg-gray-950 border-l border-gray-800 shadow-2xl flex flex-col">
+        {/* Cabecera */}
         <div className="flex flex-col pt-6 px-6 pb-2 bg-gray-950/90 backdrop-blur-md border-b border-gray-800 shrink-0">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-4">
@@ -119,6 +86,7 @@ export default function PokemonEditor({ teamId, memberIndex, onClose }: PokemonE
             <button onClick={onClose} className="p-2 text-gray-400 hover:text-white hover:bg-gray-800 rounded-xl transition-all"><X size={24} /></button>
           </div>
           
+          {/* Pestañas */}
           <div className="flex gap-4 border-b border-gray-800">
             {[{ id: 'general', label: 'General' }, { id: 'stats', label: 'Stats & EVs' }, { id: 'moves', label: 'Movimientos' }].map(tab => (
               <button key={tab.id} onClick={() => setActiveTab(tab.id as any)} className={`pb-3 text-sm font-bold transition-colors relative ${activeTab === tab.id ? 'text-pink-400' : 'text-gray-500 hover:text-gray-300'}`}>
@@ -129,6 +97,7 @@ export default function PokemonEditor({ teamId, memberIndex, onClose }: PokemonE
           </div>
         </div>
 
+        {/* Contenido */}
         <div className="p-6 overflow-y-auto custom-scrollbar flex-1">
           {activeTab === 'general' && (
             <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-5">
@@ -184,17 +153,18 @@ export default function PokemonEditor({ teamId, memberIndex, onClose }: PokemonE
           {activeTab === 'moves' && (
             <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-4">
               <p className="text-xs text-pink-400 mb-4 bg-pink-500/10 p-3 rounded-lg border border-pink-500/20">
-                Mostrando movimientos legales que {pokemon.name} puede aprender.
+                Mostrando todos los movimientos.
               </p>
               {[0, 1, 2, 3].map((moveIndex) => (
                 <div key={moveIndex}>
                   <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Slot {moveIndex + 1}</label>
-                  <input list={`legal-moves-${moveIndex}`} value={pokemon.moves?.[moveIndex] || ''} onChange={(e) => { const newMoves = [...(pokemon.moves || ['', '', '', ''])]; newMoves[moveIndex] = e.target.value; handleChange({ moves: newMoves }); }} placeholder="Escribe para buscar..." className="w-full py-2.5 px-4 bg-gray-900 border border-gray-800 rounded-xl text-white focus:outline-none focus:border-pink-500" />
-                  <datalist id={`legal-moves-${moveIndex}`}>
-                    {legalMoves.map(move => <option key={move} value={move} />)}
-                  </datalist>
+                  <input list={`moves-list`} value={pokemon.moves?.[moveIndex] || ''} onChange={(e) => { const newMoves = [...(pokemon.moves || ['', '', '', ''])]; newMoves[moveIndex] = e.target.value; handleChange({ moves: newMoves }); }} placeholder="Escribe para buscar..." className="w-full py-2.5 px-4 bg-gray-900 border border-gray-800 rounded-xl text-white focus:outline-none focus:border-pink-500" />
                 </div>
               ))}
+              {/* Usamos un solo datalist para no sobrecargar el renderizado */}
+              <datalist id="moves-list">
+                {allMoves.map(move => <option key={move.id} value={move.name} />)}
+              </datalist>
             </motion.div>
           )}
         </div>
