@@ -1,6 +1,6 @@
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Activity } from 'lucide-react';
-import { Team } from '../store/useTeamStore';
+import { Team } from '@pkmn/sets';
 import { Dex } from '@pkmn/dex';
 
 const ALL_TYPES = [
@@ -11,31 +11,43 @@ const ALL_TYPES = [
 interface TeamSynergyModalProps {
   isOpen: boolean;
   onClose: () => void;
-  team: Team | null; // Protegemos el equipo
+  team: Team | null;
 }
 
 export default function TeamSynergyModal({ isOpen, onClose, team }: TeamSynergyModalProps) {
   
-  // ESCUDO: Aseguramos que solo filtramos si los miembros son realmente un arreglo
+  // ESCUDO DEFINITIVO PARA TYPESCRIPT: 
+  // Mapeamos los datos para crear 'safeName' y 'safeSprite' que están garantizados como textos (strings)
   const validMembers = (team?.members && Array.isArray(team.members)) 
-    ? team.members.filter(p => p && p.pokemonId && p.name) 
+    ? team.members
+        .filter(p => p && p.pokemonId && p.name)
+        .map(p => ({
+          ...p,
+          safeName: String(p.name),
+          safeSprite: String(p.sprite)
+        }))
     : [];
 
   const getMultiplier = (pokemonName: string, attackingType: string) => {
-    const species = Dex.species.get(pokemonName);
-    if (!species || !species.types) return 1;
+    try {
+      if (!pokemonName) return 1;
+      const species = Dex.species.get(pokemonName);
+      if (!species || !species.types) return 1;
 
-    let multiplier = 1;
-    for (const defType of species.types) {
-      const typeData = Dex.types.get(defType);
-      if (!typeData) continue;
-      
-      const damageTaken = typeData.damageTaken[attackingType];
-      if (damageTaken === 1) multiplier *= 2;
-      else if (damageTaken === 2) multiplier *= 0.5;
-      else if (damageTaken === 3) multiplier *= 0;
+      let multiplier = 1;
+      for (const defType of species.types) {
+        const typeData = Dex.types.get(defType);
+        if (!typeData) continue;
+        
+        const damageTaken = typeData.damageTaken[attackingType];
+        if (damageTaken === 1) multiplier *= 2;
+        else if (damageTaken === 2) multiplier *= 0.5;
+        else if (damageTaken === 3) multiplier *= 0;
+      }
+      return multiplier;
+    } catch (error) {
+      return 1;
     }
-    return multiplier;
   };
 
   return (
@@ -70,8 +82,9 @@ export default function TeamSynergyModal({ isOpen, onClose, team }: TeamSynergyM
 
               <div className="space-y-2">
                 {ALL_TYPES.map(type => {
-                  const weakPokemon = validMembers.filter(p => getMultiplier(p.name!, type) > 1);
-                  const resistPokemon = validMembers.filter(p => getMultiplier(p.name!, type) < 1);
+                  // Ahora usamos safeName, por lo que la línea roja desaparecerá de inmediato
+                  const weakPokemon = validMembers.filter(p => getMultiplier(p.safeName, type) > 1);
+                  const resistPokemon = validMembers.filter(p => getMultiplier(p.safeName, type) < 1);
 
                   return (
                     <div key={type} className="grid grid-cols-12 gap-4 items-center bg-gray-950/50 p-2 rounded-xl border border-gray-800/50 hover:border-pink-500/30 transition-colors">
@@ -84,9 +97,9 @@ export default function TeamSynergyModal({ isOpen, onClose, team }: TeamSynergyM
                         {weakPokemon.length === 0 ? <span className="text-gray-600 text-xs italic py-2">Ninguno</span> : null}
                         {weakPokemon.map(p => (
                           <div key={p.slotId} className="relative group">
-                            <img src={p.sprite!} alt={p.name!} className="w-8 h-8 object-contain drop-shadow" />
+                            <img src={p.safeSprite} alt={p.safeName} className="w-8 h-8 object-contain drop-shadow" />
                             <span className="absolute -top-2 -right-2 text-[9px] font-bold bg-red-500/20 text-red-400 px-1 rounded ring-1 ring-red-500/50">
-                              {getMultiplier(p.name!, type)}x
+                              {getMultiplier(p.safeName, type)}x
                             </span>
                           </div>
                         ))}
@@ -96,9 +109,9 @@ export default function TeamSynergyModal({ isOpen, onClose, team }: TeamSynergyM
                         {resistPokemon.length === 0 ? <span className="text-gray-600 text-xs italic py-2">Ninguno</span> : null}
                         {resistPokemon.map(p => (
                           <div key={p.slotId} className="relative group">
-                            <img src={p.sprite!} alt={p.name!} className="w-8 h-8 object-contain drop-shadow" />
-                            <span className={`absolute -top-2 -right-2 text-[9px] font-bold px-1 rounded ring-1 ${getMultiplier(p.name!, type) === 0 ? 'bg-blue-500/20 text-blue-400 ring-blue-500/50' : 'bg-green-500/20 text-green-400 ring-green-500/50'}`}>
-                              {getMultiplier(p.name!, type)}x
+                            <img src={p.safeSprite} alt={p.safeName} className="w-8 h-8 object-contain drop-shadow" />
+                            <span className={`absolute -top-2 -right-2 text-[9px] font-bold px-1 rounded ring-1 ${getMultiplier(p.safeName, type) === 0 ? 'bg-blue-500/20 text-blue-400 ring-blue-500/50' : 'bg-green-500/20 text-green-400 ring-green-500/50'}`}>
+                              {getMultiplier(p.safeName, type)}x
                             </span>
                           </div>
                         ))}

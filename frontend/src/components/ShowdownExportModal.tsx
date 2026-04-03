@@ -1,56 +1,59 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Copy, Check, Share2 } from 'lucide-react';
-import { Team } from '../store/useTeamStore';
+import { Team } from '@pkmn/sets';
 
 interface ShowdownExportModalProps {
   isOpen: boolean;
   onClose: () => void;
-  team: Team | null; // Protegemos el equipo
+  team: Team | null;
 }
 
 export default function ShowdownExportModal({ isOpen, onClose, team }: ShowdownExportModalProps) {
   const [copied, setCopied] = useState(false);
 
   const generateShowdownText = () => {
-    // ESCUDO: Si no hay equipo o los miembros no son un arreglo, no hacemos nada
-    if (!team || !Array.isArray(team.members)) return '';
+    try {
+      if (!team || !Array.isArray(team.members)) return '';
 
-    return team.members
-      .filter(p => p && p.pokemonId && p.name)
-      .map(p => {
-        let text = `${p.name}`;
-        if (p.item) text += ` @ ${p.item}`;
-        text += '\n';
-        
-        if (p.ability) text += `Ability: ${p.ability}\n`;
-        if (p.level && p.level !== 100) text += `Level: ${p.level}\n`;
+      return team.members
+        .filter(p => p && p.pokemonId && p.name)
+        .map(p => {
+          let text = `${p.name}`;
+          if (p.item) text += ` @ ${p.item}`;
+          text += '\n';
+          
+          if (p.ability) text += `Ability: ${p.ability}\n`;
+          if (p.level && p.level !== 100) text += `Level: ${p.level}\n`;
 
-        const evs: string[] = [];
-        const evOrder: (keyof typeof p.evs)[] = ['hp', 'atk', 'def', 'spa', 'spd', 'spe'];
-        const evLabels = { hp: 'HP', atk: 'Atk', def: 'Def', spa: 'SpA', spd: 'SpD', spe: 'Spe' };
-        
-        evOrder.forEach(stat => {
-          if (p.evs && p.evs[stat] > 0) evs.push(`${p.evs[stat]} ${evLabels[stat]}`);
-        });
-        if (evs.length > 0) text += `EVs: ${evs.join(' / ')}\n`;
-
-        if (p.nature && p.nature !== 'Serious') text += `${p.nature} Nature\n`;
-
-        const ivs: string[] = [];
-        evOrder.forEach(stat => {
-          if (p.ivs && p.ivs[stat] < 31) ivs.push(`${p.ivs[stat]} ${evLabels[stat]}`);
-        });
-        if (ivs.length > 0) text += `IVs: ${ivs.join(' / ')}\n`;
-
-        if (p.moves && Array.isArray(p.moves)) {
-          p.moves.forEach(m => {
-            if (m) text += `- ${m}\n`;
+          const evs: string[] = [];
+          const evOrder: (keyof typeof p.evs)[] = ['hp', 'atk', 'def', 'spa', 'spd', 'spe'];
+          const evLabels = { hp: 'HP', atk: 'Atk', def: 'Def', spa: 'SpA', spd: 'SpD', spe: 'Spe' };
+          
+          evOrder.forEach(stat => {
+            if (p.evs && p.evs[stat] > 0) evs.push(`${p.evs[stat]} ${evLabels[stat]}`);
           });
-        }
-        
-        return text;
-      }).join('\n\n');
+          if (evs.length > 0) text += `EVs: ${evs.join(' / ')}\n`;
+
+          if (p.nature && p.nature !== 'Serious') text += `${p.nature} Nature\n`;
+
+          const ivs: string[] = [];
+          evOrder.forEach(stat => {
+            if (p.ivs && p.ivs[stat] < 31) ivs.push(`${p.ivs[stat]} ${evLabels[stat]}`);
+          });
+          if (ivs.length > 0) text += `IVs: ${ivs.join(' / ')}\n`;
+
+          if (p.moves && Array.isArray(p.moves)) {
+            p.moves.forEach(m => {
+              if (m) text += `- ${m}\n`;
+            });
+          }
+          
+          return text;
+        }).join('\n\n');
+    } catch (error) {
+      return "Error al generar el equipo.";
+    }
   };
 
   const exportText = generateShowdownText();
@@ -63,7 +66,6 @@ export default function ShowdownExportModal({ isOpen, onClose, team }: ShowdownE
 
   return (
     <AnimatePresence>
-      {/* Movemos el render aquí adentro para que las animaciones de salida funcionen */}
       {isOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
           <motion.div

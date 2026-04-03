@@ -1,12 +1,8 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X } from 'lucide-react';
 import { useTeamStore } from '../store/useTeamStore';
 import { Dex } from '@pkmn/dex';
-import { Generations } from '@pkmn/data';
-
-const gens = new Generations(Dex);
-const gen9 = gens.get(9);
 
 const STAT_NAMES = ['hp', 'atk', 'def', 'spa', 'spd', 'spe'] as const;
 const STAT_LABELS = { hp: 'HP', atk: 'Atk', def: 'Def', spa: 'SpA', spd: 'SpD', spe: 'Spe' };
@@ -20,59 +16,25 @@ interface PokemonEditorProps {
 export default function PokemonEditor({ teamId, memberIndex, onClose }: PokemonEditorProps) {
   const { teams, updateTeamMember } = useTeamStore();
   const [activeTab, setActiveTab] = useState<'general' | 'stats' | 'moves'>('general');
-  const [legalMoves, setLegalMoves] = useState<string[]>([]);
 
   const allItems = useMemo(() => Array.from(Dex.items.all()), []);
   const allAbilities = useMemo(() => Array.from(Dex.abilities.all()), []);
   const allNatures = useMemo(() => Array.from(Dex.natures.all()), []);
-  const allMovesFallback = useMemo(() => Array.from(Dex.moves.all()), []);
+  const allMoves = useMemo(() => Array.from(Dex.moves.all()), []);
 
   if (memberIndex === null) return null;
 
   const activeTeam = teams.find(t => t.id === teamId);
   const pokemon = activeTeam?.members[memberIndex];
 
-  if (!pokemon || !pokemon.pokemonId) return null;
+  if (!pokemon || !pokemon.pokemonId || !pokemon.name) return null;
 
-  // --- 1. ELIMINAMOS LA LÍNEA ROJA DE TYPESCRIPT ---
-  // Le decimos a TypeScript que esto es un texto seguro al 100%
-  const pokemonNameSeguro = pokemon.name ? String(pokemon.name) : "";
+  const safeName = String(pokemon.name);
 
   const handleChange = (changes: Partial<typeof pokemon>) => {
     updateTeamMember(teamId, memberIndex, changes);
   };
 
-  useEffect(() => {
-    async function loadLegalMoves() {
-      if (!pokemonNameSeguro) return;
-      try {
-        // Usamos la variable segura, así que TypeScript no se va a quejar jamás
-        const species = gen9.species.get(pokemonNameSeguro);
-        if (!species) return;
-
-        let learnset = await Dex.learnsets.get(species.id);
-        if (!learnset || !learnset.learnset) {
-          const baseSpecies = gen9.species.get(species.baseSpecies);
-          if (baseSpecies) learnset = await Dex.learnsets.get(baseSpecies.id);
-        }
-
-        if (learnset && learnset.learnset) {
-          const moveIds = Object.keys(learnset.learnset);
-          const moveNames = moveIds.map(id => gen9.moves.get(id)?.name).filter(Boolean) as string[];
-          setLegalMoves(moveNames);
-        } else {
-          setLegalMoves(allMovesFallback.map(m => m.name));
-        }
-      } catch (error) {
-        setLegalMoves(allMovesFallback.map(m => m.name));
-      }
-    }
-    loadLegalMoves();
-  }, [pokemonNameSeguro, allMovesFallback]);
-
-
-  // --- 2. ELIMINAMOS LA PANTALLA BLANCA DE ERROR DE 'hp' ---
-  // Este "escudo" atrapa los datos dañados de Supabase y les pone 0
   const getSafeStat = (obj: any, statKey: string, fallback: number) => {
     if (obj && typeof obj === 'object' && statKey in obj) {
       const val = Number(obj[statKey]);
@@ -81,8 +43,8 @@ export default function PokemonEditor({ teamId, memberIndex, onClose }: PokemonE
     return fallback;
   };
 
-  const speciesData = gen9.species.get(pokemonNameSeguro);
-  const natureObj = gen9.natures.get(pokemon.nature || 'Serious');
+  const speciesData = Dex.species.get(safeName);
+  const natureObj = Dex.natures.get(pokemon.nature || 'Serious');
   const safeLevel = Number(pokemon.level) || 50;
 
   const calculateStat = (statName: string, base: number, iv: number, ev: number, level: number, nature: any) => {
@@ -184,17 +146,17 @@ export default function PokemonEditor({ teamId, memberIndex, onClose }: PokemonE
           {activeTab === 'moves' && (
             <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-4">
               <p className="text-xs text-pink-400 mb-4 bg-pink-500/10 p-3 rounded-lg border border-pink-500/20">
-                Mostrando movimientos legales que {pokemon.name} puede aprender.
+                Mostrando todos los movimientos.
               </p>
               {[0, 1, 2, 3].map((moveIndex) => (
                 <div key={moveIndex}>
                   <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Slot {moveIndex + 1}</label>
-                  <input list={`legal-moves-${moveIndex}`} value={pokemon.moves?.[moveIndex] || ''} onChange={(e) => { const newMoves = [...(pokemon.moves || ['', '', '', ''])]; newMoves[moveIndex] = e.target.value; handleChange({ moves: newMoves }); }} placeholder="Escribe para buscar..." className="w-full py-2.5 px-4 bg-gray-900 border border-gray-800 rounded-xl text-white focus:outline-none focus:border-pink-500" />
-                  <datalist id={`legal-moves-${moveIndex}`}>
-                    {legalMoves.map(move => <option key={move} value={move} />)}
-                  </datalist>
+                  <input list={`moves-list`} value={pokemon.moves?.[moveIndex] || ''} onChange={(e) => { const newMoves = [...(pokemon.moves || ['', '', '', ''])]; newMoves[moveIndex] = e.target.value; handleChange({ moves: newMoves }); }} placeholder="Escribe para buscar..." className="w-full py-2.5 px-4 bg-gray-900 border border-gray-800 rounded-xl text-white focus:outline-none focus:border-pink-500" />
                 </div>
               ))}
+              <datalist id="moves-list">
+                {allMoves.map(move => <option key={move.id} value={move.name} />)}
+              </datalist>
             </motion.div>
           )}
         </div>

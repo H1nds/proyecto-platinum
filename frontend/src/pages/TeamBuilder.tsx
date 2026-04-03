@@ -9,21 +9,19 @@ import ShowdownExportModal from '../components/ShowdownExportModal';
 import TeamSynergyModal from '../components/TeamSynergyModal';
 
 export default function TeamBuilder() {
-  // Añadimos updateTeam que acabamos de crear en Zustand
   const { 
-  teams, activeTeamId, isLoading, isSaving, 
-  fetchTeams, saveTeam, createNewTeam, setActiveTeam, 
-  deleteTeam, updateTeam, removeTeamMember, updateTeamMember 
+    teams, activeTeamId, isLoading, isSaving, 
+    fetchTeams, saveTeam, createNewTeam, setActiveTeam, 
+    deleteTeam, updateTeam, removeTeamMember, updateTeamMember 
   } = useTeamStore();
 
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [selectedSlot, setSelectedSlot] = useState<number | null>(null);
   const [isImportOpen, setIsImportOpen] = useState(false);
-  const [isExportOpen, setIsExportOpen] = useState(false);   // <-- NUEVO
-  const [isSynergyOpen, setIsSynergyOpen] = useState(false); // <-- NUEVO
+  const [isExportOpen, setIsExportOpen] = useState(false);
+  const [isSynergyOpen, setIsSynergyOpen] = useState(false);
   const [editingSlot, setEditingSlot] = useState<number | null>(null);
 
-  // Cargar equipos desde Supabase al entrar a la pantalla
   useEffect(() => {
     fetchTeams();
   }, [fetchTeams]);
@@ -51,7 +49,6 @@ export default function TeamBuilder() {
     <div className="min-h-screen p-8 text-white bg-gray-950">
       <div className="max-w-6xl mx-auto">
         
-        {/* Cabecera dinámica mejorada */}
         <div className="flex items-center gap-4 mb-2">
           {activeTeam && (
             <button 
@@ -63,7 +60,6 @@ export default function TeamBuilder() {
           )}
           
           {activeTeam ? (
-            // Input para editar el nombre del equipo
             <div className="relative flex-1 group">
               <input
                 type="text"
@@ -85,24 +81,22 @@ export default function TeamBuilder() {
           )}
         </div>
         
-        {/* Barra de Herramientas del Equipo (Formato, Importar y Guardar) */}
-     {activeTeam ? (
-       <div className="mb-8 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-         <div className="flex items-center gap-3">
-           <span className="text-gray-400 font-medium">Formato:</span>
-           <select
-             value={activeTeam.format}
-             onChange={(e) => updateTeam(activeTeam.id, { format: e.target.value as any })}
-             className="bg-gray-900 border border-gray-700 text-white text-sm rounded-lg focus:ring-pink-500 focus:border-pink-500 block px-3 py-1.5 outline-none"
-           >
-             <option value="VGC">VGC (Dobles)</option>
-             <option value="Singles">Singles (OU)</option>
-             <option value="Custom">Custom / Sin Reglas</option>
-           </select>
-         </div>
+        {activeTeam ? (
+          <div className="mb-8 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <span className="text-gray-400 font-medium">Formato:</span>
+              <select
+                value={activeTeam.format}
+                onChange={(e) => updateTeam(activeTeam.id, { format: e.target.value as any })}
+                className="bg-gray-900 border border-gray-700 text-white text-sm rounded-lg focus:ring-pink-500 focus:border-pink-500 block px-3 py-1.5 outline-none"
+              >
+                <option value="VGC">VGC (Dobles)</option>
+                <option value="Singles">Singles (OU)</option>
+                <option value="Custom">Custom / Sin Reglas</option>
+              </select>
+            </div>
 
-         <div className="flex flex-wrap items-center gap-2 sm:gap-3">
-              {/* Botón Sinergia */}
+            <div className="flex flex-wrap items-center gap-2 sm:gap-3">
               <button 
                 onClick={() => setIsSynergyOpen(true)}
                 className="flex items-center gap-2 px-3 py-2 bg-gray-900 border border-gray-800 text-gray-300 text-sm font-semibold rounded-lg hover:bg-gray-800 hover:text-white transition-all"
@@ -111,7 +105,6 @@ export default function TeamBuilder() {
                 <span className="hidden sm:inline">Sinergia</span>
               </button>
 
-              {/* Botones Importar / Exportar */}
               <div className="flex items-center bg-gray-900 border border-gray-800 rounded-lg overflow-hidden">
                 <button 
                   onClick={() => setIsImportOpen(true)}
@@ -129,7 +122,6 @@ export default function TeamBuilder() {
                 </button>
               </div>
               
-              {/* Botón Guardar */}
               <button 
                 onClick={() => saveTeam(activeTeam.id)}
                 disabled={isSaving}
@@ -139,37 +131,17 @@ export default function TeamBuilder() {
                 {isSaving ? 'Guardando...' : <span className="hidden sm:inline">Guardar Equipo</span>}
               </button>
             </div>
-       </div>
-     ) : (
-       // Vista de carga inicial para la lista de equipos
-       isLoading ? (
-         <div className="flex justify-center py-12">
-           <Loader2 className="w-10 h-10 text-pink-500 animate-spin" />
-         </div>
-       ) : (
-         <p className="mb-8 text-gray-400">Construye tus equipos, importa tus estrategias y prepárate para dominar el meta.</p>
-       )
-     )}
+          </div>
+        ) : (
+          isLoading ? (
+            <div className="flex justify-center py-12">
+              <Loader2 className="w-10 h-10 text-pink-500 animate-spin" />
+            </div>
+          ) : (
+             <p className="mb-8 text-gray-400">Construye tus equipos, importa tus estrategias y prepárate para dominar el meta.</p>
+          )
+        )}
 
-     {/* Renderizamos el Editor de Pokémon manual */}
-     {activeTeam && (
-       <PokemonEditor
-         teamId={activeTeam.id}
-         memberIndex={editingSlot}
-         onClose={() => setEditingSlot(null)}
-       />
-     )}
-
-     {/* Renderizamos el Modal de Importación */}
-     {activeTeam && (
-       <ShowdownImportModal
-         isOpen={isImportOpen}
-         onClose={() => setIsImportOpen(false)}
-         teamId={activeTeam.id}
-       />
-     )}
-
-        {/* VISTA 1: Lista de Equipos */}
         {!activeTeam && (
           <div className="space-y-6">
             <div className="flex justify-end">
@@ -211,7 +183,6 @@ export default function TeamBuilder() {
                       </span>
                     </div>
 
-                    {/* PREVIEW DE SPRITES */}
                     <div className="mt-4 flex gap-1 bg-gray-950/50 p-2 rounded-xl justify-between border border-gray-800/50">
                       {team.members.map((m, i) => (
                         <div key={i} className="w-10 h-10 flex items-center justify-center bg-gray-900/80 rounded-lg border border-gray-800">
@@ -230,7 +201,6 @@ export default function TeamBuilder() {
           </div>
         )}
 
-        {/* VISTA 2: Edición del Equipo */}
         {activeTeam && (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {activeTeam.members.map((member, index) => (
@@ -252,13 +222,12 @@ export default function TeamBuilder() {
                     <img src={member.sprite!} alt={member.name!} className="w-24 h-24 object-contain drop-shadow-lg" />
                     <p className="mt-2 font-bold capitalize text-white">{member.name}</p>
                     
-                    {/* Botón temporal preparándonos para la edición de stats */}
                     <button 
-                   onClick={() => setEditingSlot(index)}
-                   className="absolute bottom-3 px-3 py-1 bg-pink-600/10 text-xs text-pink-400 rounded-lg opacity-0 group-hover:opacity-100 transition-all font-medium hover:bg-pink-600/20"
-                 >
-                   Editar Stats & Moves →
-                 </button>
+                      onClick={() => setEditingSlot(index)}
+                      className="absolute bottom-3 px-3 py-1 bg-pink-600/10 text-xs text-pink-400 rounded-lg opacity-0 group-hover:opacity-100 transition-all font-medium hover:bg-pink-600/20"
+                    >
+                      Editar Stats & Moves →
+                    </button>
                   </>
                 ) : (
                   <button 
@@ -274,13 +243,17 @@ export default function TeamBuilder() {
           </div>
         )}
 
-        <PokemonSearchModal 
-          isOpen={isSearchOpen}
-          onClose={() => setIsSearchOpen(false)}
-          onSelect={handleSelectPokemon}
-        />
+        <PokemonSearchModal isOpen={isSearchOpen} onClose={() => setIsSearchOpen(false)} onSelect={handleSelectPokemon} />
 
-        
+        {/* AQUÍ ESTABA EL ERROR: Solo los renderizamos una vez al final del archivo */}
+        {activeTeam && (
+          <>
+            <ShowdownImportModal isOpen={isImportOpen} onClose={() => setIsImportOpen(false)} teamId={activeTeam.id} />
+            <ShowdownExportModal isOpen={isExportOpen} onClose={() => setIsExportOpen(false)} team={activeTeam} />
+            <TeamSynergyModal isOpen={isSynergyOpen} onClose={() => setIsSynergyOpen(false)} team={activeTeam} />
+            <PokemonEditor teamId={activeTeam.id} memberIndex={editingSlot} onClose={() => setEditingSlot(null)} />
+          </>
+        )}
 
       </div>
     </div>
