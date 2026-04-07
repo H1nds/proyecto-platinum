@@ -1,4 +1,3 @@
-// src/utils/engine.ts
 import { Battle } from '@pkmn/sim';
 
 export const formatTeamForEngine = (team: any[]) => {
@@ -23,9 +22,10 @@ export const formatTeamForEngine = (team: any[]) => {
 
 export const startShowdownEngine = (format: string, p1Name: string, p1Team: any[], p2Name: string, p2Team: any[]) => {
   
-  // SOLUCIÓN AL ERROR ROJO: Engañamos a TS diciendo que toda la configuración es "any"
+  // EL TRUCO DEFINITIVO: Añadimos '@@@!teampreview' para desactivar la fase de elección.
+  // El motor lanzará al primer Pokémon automáticamente.
   const battle = new Battle({
-    formatid: 'gen9customgame', 
+    formatid: 'gen9customgame@@@!teampreview', 
     seed: [1, 2, 3, 4], 
   } as any);
 

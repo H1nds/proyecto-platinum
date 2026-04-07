@@ -41,6 +41,28 @@ export default function BattleArena() {
 
   const lastLogIndex = useRef<number>(0);
 
+  // --- NUEVOS ESTADOS DE COMBATE ---
+  const [myHpString, setMyHpString] = useState('100/100');
+  const [oppHpString, setOppHpString] = useState('100/100');
+  const [waitingForTurn, setWaitingForTurn] = useState(false); // Candado para no hacer spam de ataques
+
+  // Transformamos el texto de vida ("40/100") en un porcentaje real para la barra verde
+  const getHpPercent = (hp: string) => {
+    if (!hp) return 100;
+    if (hp.includes('fnt')) return 0; // "fnt" significa Fainted (Debilitado)
+    const cleanHp = hp.split(' ')[0]; 
+    const parts = cleanHp.split('/');
+    if (parts.length === 2) {
+       const current = parseInt(parts[0]);
+       const max = parseInt(parts[1]);
+       if (max === 0) return 0;
+       return Math.max(0, Math.min(100, (current / max) * 100));
+    }
+    const parsed = parseInt(cleanHp);
+    if (!isNaN(parsed)) return parsed;
+    return 100;
+  };
+
   // --- TRADUCTOR DE PROTOCOLOS ---
   const processBattleProtocol = (logText: string) => {
     if (!logText) return;
@@ -56,11 +78,12 @@ export default function BattleArena() {
         setMessages(prev => [...prev, { id: crypto.randomUUID(), senderName: 'Árbitro', text: '¡El combate ha comenzado!', isSystem: true }]);
       } 
       else if (command === 'switch') {
-        const pokeIdentity = parts[2];
+        const pokeIdentity = parts[2]; // ej: p1a: Charizard
         const pokeName = pokeIdentity.split(': ')[1] || pokeIdentity;
         setMessages(prev => [...prev, { id: crypto.randomUUID(), senderName: 'Árbitro', text: `¡Adelante, ${pokeName}!`, isSystem: true }]);
       }
       else if (command === 'turn') {
+        setWaitingForTurn(false); // ¡Terminó el turno! Desbloqueamos los botones
         setMessages(prev => [...prev, { id: crypto.randomUUID(), senderName: 'Árbitro', text: `--- Turno ${parts[2]} ---`, isSystem: true }]);
       }
       else if (command === 'move') {
@@ -69,15 +92,29 @@ export default function BattleArena() {
         const moveName = parts[3];
         setMessages(prev => [...prev, { id: crypto.randomUUID(), senderName: 'Árbitro', text: `¡${attackerName} usó ${moveName}!`, isSystem: true }]);
       }
-      else if (command === '-damage') {
+      else if (command === '-damage' || command === '-heal') {
         const victimIdentity = parts[2];
         const victimName = victimIdentity.split(': ')[1] || victimIdentity;
-        const hpString = parts[3];
-        setMessages(prev => [...prev, { id: crypto.randomUUID(), senderName: 'Árbitro', text: `¡${victimName} recibió daño! (HP: ${hpString})`, isSystem: true }]);
+        const hpString = parts[3].split(' ')[0]; // "40/100"
+        
+        // Identificamos de quién es el Pokémon para bajar la barra correcta
+        // isHost = true (Yo soy p1, rival p2). isHost = false (Yo soy p2, rival p1)
+        const isMyPoke = isHost ? victimIdentity.startsWith('p1') : victimIdentity.startsWith('p2');
+        
+        if (isMyPoke) setMyHpString(hpString);
+        else setOppHpString(hpString);
+
+        const actionText = command === '-heal' ? 'recuperó salud' : 'recibió daño';
+        setMessages(prev => [...prev, { id: crypto.randomUUID(), senderName: 'Árbitro', text: `¡${victimName} ${actionText}! (HP: ${hpString})`, isSystem: true }]);
       }
       else if (command === 'faint') {
         const victimIdentity = parts[2];
         const victimName = victimIdentity.split(': ')[1] || victimIdentity;
+        
+        const isMyPoke = isHost ? victimIdentity.startsWith('p1') : victimIdentity.startsWith('p2');
+        if (isMyPoke) setMyHpString('0/100 fnt');
+        else setOppHpString('0/100 fnt');
+
         setMessages(prev => [...prev, { id: crypto.randomUUID(), senderName: 'Árbitro', text: `¡${victimName} se ha debilitado!`, isSystem: true }]);
       }
     });
@@ -166,10 +203,11 @@ export default function BattleArena() {
         if (isHost && battleEngine) {
           const clientMoveNumber = payload.payload.moveIndex + 1;
           try {
-             battleEngine.choose('p2', `move ${clientMoveNumber}`);
+             const success = battleEngine.choose('p2', `move ${clientMoveNumber}`);
+             if (!success) console.log("Ataque del cliente rechazado. (El Pokémon podría estar debilitado o esperando otra orden)");
              flushLogs(battleEngine, channel); 
           } catch(e) {
-             console.error("El Host falló al inyectar el ataque del Cliente", e);
+             console.error("Error al inyectar ataque del Cliente", e);
           }
         }
       })
@@ -181,19 +219,8 @@ export default function BattleArena() {
            }]);
 
            if (isHost && battleEngine) {
-             const hasStarted = battleEngine.log.some(line => line.includes('|start'));
-             if (!hasStarted) {
-                try {
-                  battleEngine.start();
-                  
-                  // --- EL TRUCO PARA SALTAR EL TEAM PREVIEW ---
-                  // Le decimos al motor que ambos eligen a su primer Pokémon por defecto
-                  battleEngine.choose('p1', 'default');
-                  battleEngine.choose('p2', 'default');
-                  
-                  flushLogs(battleEngine, channel); 
-                } catch (e) { }
-             }
+             // Solo mandamos el registro inicial limpio. Sin mensajes dobles.
+             flushLogs(battleEngine, channel); 
            }
         }
       });
@@ -229,14 +256,22 @@ export default function BattleArena() {
   };
 
   const handleAttack = async (moveIndex: number) => {
+    setWaitingForTurn(true); // Bloqueamos los botones instantáneamente
+
     if (isHost && battleEngine) {
       const showdownMoveNumber = moveIndex + 1;
       try {
-         battleEngine.choose('p1', `move ${showdownMoveNumber}`);
-         setMessages(prev => [...prev, { id: crypto.randomUUID(), senderName: 'Sistema', text: 'Esperando orden del rival...', isSystem: true }]);
+         const success = battleEngine.choose('p1', `move ${showdownMoveNumber}`);
+         if (success) {
+            setMessages(prev => [...prev, { id: crypto.randomUUID(), senderName: 'Sistema', text: 'Esperando orden del rival...', isSystem: true }]);
+         } else {
+            setMessages(prev => [...prev, { id: crypto.randomUUID(), senderName: 'Sistema', text: 'Turno inválido. El motor rechazó el ataque.', isSystem: true }]);
+            setWaitingForTurn(false);
+         }
          flushLogs(battleEngine, battleChannel);
       } catch (e) {
          console.error("Error al atacar:", e);
+         setWaitingForTurn(false);
       }
     } else {
        if (!battleChannel) return;
@@ -246,9 +281,10 @@ export default function BattleArena() {
            event: 'client_action',
            payload: { moveIndex: moveIndex }
          });
-         setMessages(prev => [...prev, { id: crypto.randomUUID(), senderName: 'Sistema', text: 'Orden enviada. Esperando al Host...', isSystem: true }]);
+         setMessages(prev => [...prev, { id: crypto.randomUUID(), senderName: 'Sistema', text: 'Orden enviada. Esperando al rival...', isSystem: true }]);
        } catch (e) {
          console.error("Error al enviar el ataque:", e);
+         setWaitingForTurn(false);
        }
     }
   };
@@ -258,6 +294,10 @@ export default function BattleArena() {
     const cleanName = pokemonName.toLowerCase().replace(/[^a-z0-9]/g, '');
     return `https://play.pokemonshowdown.com/sprites/ani${isBack ? '-back' : ''}/${cleanName}.gif`;
   };
+
+  // Porcentajes de vida para el CSS
+  const myWidth = `${getHpPercent(myHpString)}%`;
+  const oppWidth = `${getHpPercent(oppHpString)}%`;
 
   return (
     <div className="flex flex-col lg:flex-row h-screen bg-gray-950 text-white overflow-hidden selection:bg-pink-500">
@@ -282,10 +322,11 @@ export default function BattleArena() {
             <div className="bg-gray-900/80 p-2 rounded-xl border border-gray-700 shadow-xl mb-2 backdrop-blur-md">
               <div className="flex justify-between items-center text-sm font-bold mb-1">
                 <span className="capitalize">{activeOppPoke?.name || '???'}</span>
-                <span className="text-green-400">100%</span>
+                <span className="text-green-400">{getHpPercent(oppHpString).toFixed(0)}%</span>
               </div>
               <div className="h-2 w-full bg-gray-800 rounded-full overflow-hidden">
-                <div className="h-full bg-green-500 w-full transition-all duration-500"></div>
+                 {/* BARRA VIVA */}
+                <div className="h-full bg-green-500 transition-all duration-500" style={{ width: oppWidth }}></div>
               </div>
             </div>
             <img src={getSpriteUrl(activeOppPoke?.name, false)} alt="Oponente" className="inline-block w-24 h-24 object-contain drop-shadow-2xl opacity-90" />
@@ -297,10 +338,11 @@ export default function BattleArena() {
             <div className="bg-gray-900/90 p-3 rounded-xl border border-pink-500/30 shadow-xl shadow-pink-500/10 backdrop-blur-md">
               <div className="flex justify-between items-center text-sm font-bold mb-1">
                 <span className="text-pink-400 capitalize">{activeMyPoke?.name || '???'}</span>
-                <span className="text-green-400">100%</span>
+                <span className="text-green-400">{myHpString}</span>
               </div>
               <div className="h-2.5 w-full bg-gray-800 rounded-full overflow-hidden">
-                <div className="h-full bg-green-500 w-full transition-all duration-500"></div>
+                 {/* BARRA VIVA */}
+                <div className="h-full bg-green-500 transition-all duration-500" style={{ width: myWidth }}></div>
               </div>
               <div className="mt-1 flex gap-1">
                 {myTeam.map((_, i) => <div key={i} className="w-3 h-3 rounded-full bg-pink-500/50 border border-pink-500" />)}
@@ -317,7 +359,8 @@ export default function BattleArena() {
               <button 
                 key={index} 
                 onClick={() => handleAttack(index)}
-                className="bg-gray-900 border border-gray-700 hover:border-pink-500 hover:bg-gray-800 rounded-xl p-3 flex flex-col items-start justify-center transition-all cursor-pointer"
+                disabled={waitingForTurn} // Candado activado
+                className={`bg-gray-900 border border-gray-700 rounded-xl p-3 flex flex-col items-start justify-center transition-all cursor-pointer ${waitingForTurn ? 'opacity-50 cursor-not-allowed' : 'hover:border-pink-500 hover:bg-gray-800'}`}
               >
                 <span className="font-bold text-white text-lg capitalize">{move || 'Vacío'}</span>
                 {move && <span className="text-xs font-bold text-pink-500 uppercase">Usar Ataque</span>}
