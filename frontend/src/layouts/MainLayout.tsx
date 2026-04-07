@@ -163,6 +163,9 @@ export default function MainLayout() {
                 // Nuestro amigo nos aceptó la pelea
                 setOutgoingChallenge(null);
                 alert(`¡${outgoingChallenge?.targetName || 'Tu oponente'} ha aceptado el reto! (Preparando la arena...)`);
+                
+                // ¡LA LÍNEA MÁGICA QUE FALTABA!
+                navigate(`/battle/${newRecord.id}`); 
               }
             } else if (newRecord.status === 'declined') {
               if (newRecord.challenger_id === userId) {
@@ -217,6 +220,7 @@ export default function MainLayout() {
       if (error) throw error;
       setIncomingChallenge(null);
       setIsAcceptModalOpen(false);
+      navigate(`/battle/${incomingChallenge.id}`);
       alert(`¡Duelo aceptado con el equipo: ${chosenTeam.name}! (Redirigiendo a la Arena en el siguiente paso)`);
     } catch (error) {
       console.error("Error al aceptar el duelo:", error);
