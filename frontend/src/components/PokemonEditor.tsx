@@ -3,9 +3,11 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { X } from 'lucide-react';
 import { useTeamStore } from '../store/useTeamStore';
 import { Dex } from '@pkmn/dex';
+import { getGenFromFormat } from '../utils/formats'; // <-- Importamos nuestro motor generacional
 
 const STAT_NAMES = ['hp', 'atk', 'def', 'spa', 'spd', 'spe'] as const;
 const STAT_LABELS = { hp: 'HP', atk: 'Atk', def: 'Def', spa: 'SpA', spd: 'SpD', spe: 'Spe' };
+const TERA_TYPES = ['Normal', 'Fire', 'Water', 'Electric', 'Grass', 'Ice', 'Fighting', 'Poison', 'Ground', 'Flying', 'Psychic', 'Bug', 'Rock', 'Ghost', 'Dragon', 'Dark', 'Steel', 'Fairy', 'Stellar'];
 
 interface PokemonEditorProps {
   teamId: string;
@@ -27,7 +29,16 @@ export default function PokemonEditor({ teamId, memberIndex, onClose }: PokemonE
   const activeTeam = teams.find(t => t.id === teamId);
   const pokemon = activeTeam?.members[memberIndex];
 
-  if (!pokemon || !pokemon.pokemonId || !pokemon.name) return null;
+  if (!pokemon || !pokemon.pokemonId || !pokemon.name || !activeTeam) return null;
+
+  // --- MOTOR GENERACIONAL ---
+  const currentGen = getGenFromFormat(activeTeam.format);
+  
+  // Reglas históricas de Pokémon
+  const hasItems = currentGen >= 2;       // Objetos introducidos en Gen 2
+  const hasAbilities = currentGen >= 3;   // Habilidades en Gen 3
+  const hasNatures = currentGen >= 3;     // Naturalezas en Gen 3
+  const hasTera = currentGen >= 9;        // Teracristalización solo en Gen 9
 
   const safeName = String(pokemon.name);
 
@@ -45,7 +56,7 @@ export default function PokemonEditor({ teamId, memberIndex, onClose }: PokemonE
 
   const speciesData = Dex.species.get(safeName);
   const natureObj = Dex.natures.get(pokemon.nature || 'Serious');
-  const safeLevel = Number(pokemon.level) || 50;
+  const safeLevel = Number(pokemon.level) || (currentGen >= 3 ? 50 : 100);
 
   const calculateStat = (statName: string, base: number, iv: number, ev: number, level: number, nature: any) => {
     if (statName === 'hp') {
@@ -53,7 +64,9 @@ export default function PokemonEditor({ teamId, memberIndex, onClose }: PokemonE
       return Math.floor(((2 * base + iv + Math.floor(ev / 4)) * level) / 100) + level + 10;
     } else {
       let raw = Math.floor(((2 * base + iv + Math.floor(ev / 4)) * level) / 100) + 5;
-      if (nature) {
+      
+      // La naturaleza solo modifica estadísticas si el formato es de Gen 3 en adelante
+      if (hasNatures && nature) {
         if (nature.plus === statName) raw = Math.floor(raw * 1.1);
         if (nature.minus === statName) raw = Math.floor(raw * 0.9);
       }
@@ -71,7 +84,10 @@ export default function PokemonEditor({ teamId, memberIndex, onClose }: PokemonE
             <div className="flex items-center gap-4">
               <img src={pokemon.sprite!} alt={pokemon.name!} className="w-16 h-16 drop-shadow-md object-contain" />
               <div>
-                <h2 className="text-2xl font-bold text-white capitalize leading-none">{pokemon.name}</h2>
+                <h2 className="text-2xl font-bold text-white capitalize leading-none flex items-center gap-2">
+                  {pokemon.name}
+                  <span className="text-[10px] bg-pink-500/20 text-pink-400 px-2 py-0.5 rounded border border-pink-500/30 uppercase">Gen {currentGen}</span>
+                </h2>
                 <div className="flex items-center gap-2 mt-2">
                   <span className="text-xs text-gray-500 font-bold uppercase tracking-wider">Lvl</span>
                   <input type="number" min="1" max="100" value={safeLevel} onChange={e => handleChange({ level: Number(e.target.value) })} className="w-14 bg-gray-900 border border-gray-700 text-white text-xs text-center rounded focus:border-pink-500 outline-none" />
@@ -83,7 +99,7 @@ export default function PokemonEditor({ teamId, memberIndex, onClose }: PokemonE
           
           <div className="flex gap-4 border-b border-gray-800">
             {[{ id: 'general', label: 'General' }, { id: 'stats', label: 'Stats & EVs' }, { id: 'moves', label: 'Movimientos' }].map(tab => (
-              <button key={tab.id} onClick={() => setActiveTab(tab.id as any)} className={`pb-3 text-sm font-bold transition-colors relative ${activeTab === tab.id ? 'text-pink-400' : 'text-gray-500 hover:text-gray-300'}`}>
+               <button key={tab.id} onClick={() => setActiveTab(tab.id as any)} className={`pb-3 text-sm font-bold transition-colors relative ${activeTab === tab.id ? 'text-pink-400' : 'text-gray-500 hover:text-gray-300'}`}>
                 {tab.label}
                 {activeTab === tab.id && <motion.div layoutId="activeTab" className="absolute bottom-0 left-0 right-0 h-0.5 bg-pink-500" />}
               </button>
@@ -94,21 +110,53 @@ export default function PokemonEditor({ teamId, memberIndex, onClose }: PokemonE
         <div className="p-6 overflow-y-auto custom-scrollbar flex-1">
           {activeTab === 'general' && (
             <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-5">
-              <div>
-                <label className="block text-sm font-semibold text-gray-400 mb-2">Objeto (Item)</label>
-                <input list="items-list" value={pokemon.item || ''} onChange={(e) => handleChange({ item: e.target.value })} className="w-full py-2.5 px-4 bg-gray-900 border border-gray-800 rounded-xl text-white focus:outline-none focus:border-pink-500" />
-                <datalist id="items-list">{allItems.map(i => <option key={i.id} value={i.name} />)}</datalist>
-              </div>
-              <div>
-                <label className="block text-sm font-semibold text-gray-400 mb-2">Habilidad (Ability)</label>
-                <input list="abilities-list" value={pokemon.ability || ''} onChange={(e) => handleChange({ ability: e.target.value })} className="w-full py-2.5 px-4 bg-gray-900 border border-gray-800 rounded-xl text-white focus:outline-none focus:border-pink-500" />
-                <datalist id="abilities-list">{allAbilities.map(a => <option key={a.id} value={a.name} />)}</datalist>
-              </div>
-              <div>
-                <label className="block text-sm font-semibold text-gray-400 mb-2">Naturaleza (Nature)</label>
-                <input list="natures-list" value={pokemon.nature || ''} onChange={(e) => handleChange({ nature: e.target.value })} className="w-full py-2.5 px-4 bg-gray-900 border border-gray-800 rounded-xl text-white focus:outline-none focus:border-pink-500" />
-                <datalist id="natures-list">{allNatures.map(n => <option key={n.id} value={n.name} />)}</datalist>
-              </div>
+              
+              {/* Ocultamos/Mostramos según la Generación */}
+              {hasItems && (
+                <div>
+                  <label className="block text-sm font-semibold text-gray-400 mb-2">Objeto (Item)</label>
+                  <input list="items-list" value={pokemon.item || ''} onChange={(e) => handleChange({ item: e.target.value })} className="w-full py-2.5 px-4 bg-gray-900 border border-gray-800 rounded-xl text-white focus:outline-none focus:border-pink-500" placeholder="Escribe un objeto..." />
+                  <datalist id="items-list">{allItems.map(i => <option key={i.id} value={i.name} />)}</datalist>
+                </div>
+              )}
+
+              {hasAbilities && (
+                <div>
+                  <label className="block text-sm font-semibold text-gray-400 mb-2">Habilidad (Ability)</label>
+                  <input list="abilities-list" value={pokemon.ability || ''} onChange={(e) => handleChange({ ability: e.target.value })} className="w-full py-2.5 px-4 bg-gray-900 border border-gray-800 rounded-xl text-white focus:outline-none focus:border-pink-500" placeholder="Escribe una habilidad..." />
+                  <datalist id="abilities-list">{allAbilities.map(a => <option key={a.id} value={a.name} />)}</datalist>
+                </div>
+              )}
+
+              {hasNatures && (
+                <div>
+                  <label className="block text-sm font-semibold text-gray-400 mb-2">Naturaleza (Nature)</label>
+                  <input list="natures-list" value={pokemon.nature || ''} onChange={(e) => handleChange({ nature: e.target.value })} className="w-full py-2.5 px-4 bg-gray-900 border border-gray-800 rounded-xl text-white focus:outline-none focus:border-pink-500" placeholder="Escribe una naturaleza..." />
+                  <datalist id="natures-list">{allNatures.map(n => <option key={n.id} value={n.name} />)}</datalist>
+                </div>
+              )}
+
+              {hasTera && (
+                <div>
+                  <label className="block text-sm font-semibold text-gray-400 mb-2 text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-green-400 flex items-center gap-2">
+                    Tera Type <span className="text-[10px] px-1.5 py-0.5 bg-blue-500/10 border border-blue-500/20 text-blue-400 rounded-full">Gen 9</span>
+                  </label>
+                  <select 
+                    value={pokemon.teraType || 'Normal'} 
+                    onChange={(e) => handleChange({ teraType: e.target.value })} 
+                    className="w-full py-2.5 px-4 bg-gray-900 border border-gray-800 rounded-xl text-white focus:outline-none focus:border-blue-500 outline-none appearance-none cursor-pointer"
+                  >
+                    {TERA_TYPES.map(type => <option key={type} value={type}>{type}</option>)}
+                  </select>
+                </div>
+              )}
+
+              {!hasItems && !hasAbilities && !hasNatures && (
+                <div className="p-4 bg-gray-900 border border-gray-800 rounded-xl text-center text-sm text-gray-400">
+                  Estás editando un equipo de <strong>Generación 1</strong>. En esta época, los Pokémon no tenían Objetos, Habilidades ni Naturalezas. ¡Todo depende de tus Stats!
+                </div>
+              )}
+
             </motion.div>
           )}
 

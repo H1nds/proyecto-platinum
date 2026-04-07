@@ -9,6 +9,7 @@ export interface TeamMember {
   item: string;
   ability: string;
   nature: string;
+  teraType: string; // <-- NUEVO: Para la Gen 9
   level: number;
   evs: { hp: number; atk: number; def: number; spa: number; spd: number; spe: number };
   ivs: { hp: number; atk: number; def: number; spa: number; spd: number; spe: number };
@@ -18,7 +19,7 @@ export interface TeamMember {
 export interface Team {
   id: string;
   name: string;
-  format: 'VGC' | 'Singles' | 'Custom';
+  format: string;
   members: TeamMember[];
 }
 
@@ -30,7 +31,7 @@ interface TeamBuilderState {
   
   fetchTeams: () => Promise<void>;
   saveTeam: (teamId: string) => Promise<void>;
-  createNewTeam: (name: string, format?: 'VGC' | 'Singles' | 'Custom') => void;
+  createNewTeam: (name: string, format?: string) => void;
   setActiveTeam: (teamId: string | null) => void;
   updateTeam: (teamId: string, updates: Partial<Team>) => void;
   updateTeamMember: (teamId: string, memberIndex: number, pokemonInfo: Partial<TeamMember>) => void;
@@ -48,6 +49,7 @@ const createEmptySlots = (): TeamMember[] =>
     item: '',
     ability: '',
     nature: 'Serious',
+    teraType: 'Normal', // Por defecto
     level: 50,
     evs: { hp: 0, atk: 0, def: 0, spa: 0, spd: 0, spe: 0 },
     ivs: { hp: 31, atk: 31, def: 31, spa: 31, spd: 31, spe: 31 },
@@ -67,7 +69,12 @@ export const useTeamStore = create<TeamBuilderState>((set, get) => ({
 
     const { data, error } = await supabase.from('teams').select('*').eq('user_id', session.user.id).order('created_at', { ascending: true });
     if (!error && data) {
-      const loadedTeams: Team[] = data.map(row => ({ id: row.id, name: row.name, format: row.format as any, members: row.members }));
+      const loadedTeams: Team[] = data.map(row => {
+        let safeFormat = row.format;
+        if (safeFormat === 'VGC') safeFormat = 'gen9vgc2024regf';
+        if (safeFormat === 'Singles') safeFormat = 'gen9ou';
+        return { id: row.id, name: row.name, format: safeFormat, members: row.members };
+      });
       set({ teams: loadedTeams, isLoading: false });
     } else {
       set({ isLoading: false });
@@ -100,7 +107,7 @@ export const useTeamStore = create<TeamBuilderState>((set, get) => ({
     await supabase.from('teams').delete().eq('id', teamId);
   },
 
-  createNewTeam: (name, format = 'VGC') => 
+  createNewTeam: (name, format = 'gen9vgc2024regf') => 
     set((state) => {
       const newTeam: Team = { id: crypto.randomUUID(), name, format, members: createEmptySlots() };
       return { teams: [...state.teams, newTeam], activeTeamId: newTeam.id };
@@ -128,7 +135,7 @@ export const useTeamStore = create<TeamBuilderState>((set, get) => ({
       if (teamIndex === -1) return state;
       const newTeams = [...state.teams];
       const newMembers = [...newTeams[teamIndex].members];
-      newMembers[memberIndex] = { slotId: crypto.randomUUID(), pokemonId: null, name: null, sprite: null, item: '', ability: '', nature: 'Serious', level: 50, evs: { hp: 0, atk: 0, def: 0, spa: 0, spd: 0, spe: 0 }, ivs: { hp: 31, atk: 31, def: 31, spa: 31, spd: 31, spe: 31 }, moves: ['', '', '', ''] };
+      newMembers[memberIndex] = { slotId: crypto.randomUUID(), pokemonId: null, name: null, sprite: null, item: '', ability: '', nature: 'Serious', teraType: 'Normal', level: 50, evs: { hp: 0, atk: 0, def: 0, spa: 0, spd: 0, spe: 0 }, ivs: { hp: 31, atk: 31, def: 31, spa: 31, spd: 31, spe: 31 }, moves: ['', '', '', ''] };
       newTeams[teamIndex] = { ...newTeams[teamIndex], members: newMembers };
       return { teams: newTeams };
     }),

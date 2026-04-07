@@ -8,6 +8,9 @@ import ShowdownImportModal from '../components/ShowdownImportModal';
 import ShowdownExportModal from '../components/ShowdownExportModal';
 import TeamSynergyModal from '../components/TeamSynergyModal';
 
+// NUEVA IMPORTACIÓN: Traemos el catálogo oficial y la función de nombres
+import { SHOWDOWN_FORMATS, getFormatName } from '../utils/formats'; 
+
 export default function TeamBuilder() {
   const { 
     teams, activeTeamId, isLoading, isSaving, 
@@ -85,14 +88,23 @@ export default function TeamBuilder() {
           <div className="mb-8 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div className="flex items-center gap-3">
               <span className="text-gray-400 font-medium">Formato:</span>
+              
+              {/* NUEVO SELECTOR: Agrupado por Generación (Idéntico a Showdown y Native-Mobile) */}
               <select
                 value={activeTeam.format}
-                onChange={(e) => updateTeam(activeTeam.id, { format: e.target.value as any })}
-                className="bg-gray-900 border border-gray-700 text-white text-sm rounded-lg focus:ring-pink-500 focus:border-pink-500 block px-3 py-1.5 outline-none"
+                onChange={(e) => updateTeam(activeTeam.id, { format: e.target.value })}
+                className="bg-gray-900 border border-gray-700 text-white text-sm rounded-lg focus:ring-pink-500 focus:border-pink-500 block px-3 py-2 outline-none max-w-[220px] truncate shadow-inner"
               >
-                <option value="VGC">VGC (Dobles)</option>
-                <option value="Singles">Singles (OU)</option>
                 <option value="Custom">Custom / Sin Reglas</option>
+                {SHOWDOWN_FORMATS.map(group => (
+                  <optgroup key={group.group} label={group.group} className="bg-gray-950 text-pink-400 font-bold">
+                    {group.options.map(opt => (
+                      <option key={opt.id} value={opt.id} className="text-white font-normal">
+                        {opt.name}
+                      </option>
+                    ))}
+                  </optgroup>
+                ))}
               </select>
             </div>
 
@@ -138,7 +150,7 @@ export default function TeamBuilder() {
               <Loader2 className="w-10 h-10 text-pink-500 animate-spin" />
             </div>
           ) : (
-             <p className="mb-8 text-gray-400">Construye tus equipos, importa tus estrategias y prepárate para dominar el meta.</p>
+            <p className="mb-8 text-gray-400">Construye tus equipos, importa tus estrategias y prepárate para dominar el meta.</p>
           )
         )}
 
@@ -178,8 +190,9 @@ export default function TeamBuilder() {
                           <Trash2 size={18} />
                         </button>
                       </div>
-                      <span className="text-xs font-semibold px-2 py-1 bg-gray-800 text-gray-400 rounded-md">
-                        {team.format}
+                      <span className="text-xs font-semibold px-2.5 py-1 bg-gray-800 text-pink-300 rounded-md border border-gray-700 truncate inline-block max-w-full">
+                        {/* Aquí mostramos el nombre bonito calculado */}
+                        {getFormatName(team.format)}
                       </span>
                     </div>
 
@@ -245,7 +258,6 @@ export default function TeamBuilder() {
 
         <PokemonSearchModal isOpen={isSearchOpen} onClose={() => setIsSearchOpen(false)} onSelect={handleSelectPokemon} />
 
-        {/* AQUÍ ESTABA EL ERROR: Solo los renderizamos una vez al final del archivo */}
         {activeTeam && (
           <>
             <ShowdownImportModal isOpen={isImportOpen} onClose={() => setIsImportOpen(false)} teamId={activeTeam.id} />
