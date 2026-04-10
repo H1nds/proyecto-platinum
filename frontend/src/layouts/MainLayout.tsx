@@ -160,11 +160,8 @@ export default function MainLayout() {
           if (eventType === 'UPDATE') {
             if (newRecord.status === 'accepted') {
               if (newRecord.challenger_id === userId) {
-                // Nuestro amigo nos aceptó la pelea
                 setOutgoingChallenge(null);
-                alert(`¡${outgoingChallenge?.targetName || 'Tu oponente'} ha aceptado el reto! (Preparando la arena...)`);
-                
-                // ¡LA LÍNEA MÁGICA QUE FALTABA!
+                // ELIMINAMOS EL ALERT AQUÍ. Solo navegamos directamente.
                 navigate(`/battle/${newRecord.id}`); 
               }
             } else if (newRecord.status === 'declined') {
